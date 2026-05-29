@@ -1,8 +1,18 @@
-import { Schema, model, Document as MongoDocument } from 'mongoose';
+import { Schema, model, Document as MongoDocument, Types } from 'mongoose';
 
-// Placeholder — logic to be implemented
-export interface IDocument extends MongoDocument {}
+export interface IDocument extends MongoDocument {
+  applicationId: Types.ObjectId;
+  filePath: string;
+  fileType: string;
+}
 
-const documentSchema = new Schema({}, { timestamps: true });
+const documentSchema = new Schema<IDocument>(
+  {
+    applicationId: { type: Schema.Types.ObjectId, ref: 'Application', required: true },
+    filePath: { type: String, required: true },
+    fileType: { type: String, required: true },
+  },
+  { timestamps: true }
+);
 
 export default model<IDocument>('Document', documentSchema);
