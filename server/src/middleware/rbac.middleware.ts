@@ -1,4 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 
-// Placeholder — role-based access control to be implemented
-export {};
+export const authorize = (allowedRoles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ message: 'Unauthorized.' });
+      return;
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      res.status(403).json({ message: 'Forbidden: you do not have access to this resource.' });
+      return;
+    }
+
+    next();
+  };
+};
