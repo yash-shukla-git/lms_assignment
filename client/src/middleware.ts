@@ -1,22 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const protectedPaths = ['/apply', '/dashboard'];
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+  const token = request.cookies.get('token')?.value;
+  const role = request.cookies.get('role')?.value;
 
-  if (isProtected) {
-    const token = request.cookies.get('token')?.value;
-    if (!token) {
+  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
+  const isApply = pathname.startsWith('/apply');
+  const isDashboard = pathname.startsWith('/dashboard');
+
+  if (isAuthPage) {
+    if (token && role) {
+      const dest = role === 'borrower' ? '/apply' : '/dashboard/sales';
+      return NextResponse.redirect(new URL(dest, request.url));
+    }
+    return NextResponse.next();
+  }
+
+  if (isApply) {
+    if (!token || role !== 'borrower') {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // TODO: decode token and redirect to role-specific dashboard
+    return NextResponse.next();
+  }
+
+  if (isDashboard) {
+    if (!token || !role || role === 'borrower') {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    return NextResponse.next();
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/apply/:path*', '/dashboard/:path*'],
+  matcher: ['/login', '/register', '/apply/:path*', '/dashboard/:path*'],
 };

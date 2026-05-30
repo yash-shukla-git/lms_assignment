@@ -1,9 +1,14 @@
-// Shared TypeScript types and interfaces — to be defined
-
-export type Role = 'borrower' | 'sales' | 'sanction' | 'disbursement' | 'collection';
+export type Role =
+  | 'borrower'
+  | 'sales'
+  | 'sanction'
+  | 'disbursement'
+  | 'collection'
+  | 'admin';
 
 export interface AuthUser {
   id: string;
+  name: string;
   email: string;
   role: Role;
 }
