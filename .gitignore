@@ -6,4 +6,6 @@ dist/
 uploads/
 *.log
 .claude
-.idea
+.idea/
+.DS_Store
+**/.DS_Store
