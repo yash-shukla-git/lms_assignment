@@ -31,7 +31,7 @@ const loanSchema = z.object({
 export const submitPersonalDetails = async (req: Request, res: Response): Promise<void> => {
   const result = personalSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ message: 'Validation error', errors: result.error.flatten().fieldErrors });
+    res.status(400).json({ success: false, message: 'Validation error', errors: result.error.flatten().fieldErrors });
     return;
   }
 
@@ -40,7 +40,7 @@ export const submitPersonalDetails = async (req: Request, res: Response): Promis
 
   const existing = await Application.findOne({ userId });
   if (existing) {
-    res.status(409).json({ message: 'An application already exists for this account.' });
+    res.status(409).json({ success: false, message: 'An application already exists for this account.' });
     return;
   }
 
@@ -64,18 +64,17 @@ export const submitPersonalDetails = async (req: Request, res: Response): Promis
 
   if (!bre.passed) {
     res.status(422).json({
+      success: false,
       message: 'Application saved but BRE check failed.',
       breStatus: 'failed',
       rejectionReason: bre.rejectionReason,
-      applicationId: application._id,
     });
     return;
   }
 
   res.status(201).json({
-    message: 'Personal details submitted successfully.',
-    breStatus: 'passed',
-    application,
+    success: true,
+    data: { breStatus: 'passed', application },
   });
 };
 
@@ -84,16 +83,16 @@ export const uploadDocument = async (req: Request, res: Response): Promise<void>
 
   const application = await Application.findOne({ userId });
   if (!application) {
-    res.status(404).json({ message: 'No application found. Please complete personal details first.' });
+    res.status(404).json({ success: false, message: 'No application found. Please complete personal details first.' });
     return;
   }
   if (application.breStatus !== 'passed') {
-    res.status(403).json({ message: 'BRE check did not pass. You cannot upload documents.' });
+    res.status(403).json({ success: false, message: 'BRE check did not pass. You cannot upload documents.' });
     return;
   }
 
   if (!req.file) {
-    res.status(400).json({ message: 'No file uploaded.' });
+    res.status(400).json({ success: false, message: 'No file uploaded.' });
     return;
   }
 
@@ -104,15 +103,15 @@ export const uploadDocument = async (req: Request, res: Response): Promise<void>
   });
 
   res.status(201).json({
-    message: 'Document uploaded successfully.',
-    document: doc,
+    success: true,
+    data: { document: doc },
   });
 };
 
 export const submitLoan = async (req: Request, res: Response): Promise<void> => {
   const result = loanSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ message: 'Validation error', errors: result.error.flatten().fieldErrors });
+    res.status(400).json({ success: false, message: 'Validation error', errors: result.error.flatten().fieldErrors });
     return;
   }
 
@@ -121,19 +120,19 @@ export const submitLoan = async (req: Request, res: Response): Promise<void> => 
 
   const application = await Application.findOne({ userId });
   if (!application || application.breStatus !== 'passed') {
-    res.status(403).json({ message: 'A passed BRE application is required before applying for a loan.' });
+    res.status(403).json({ success: false, message: 'A passed BRE application is required before applying for a loan.' });
     return;
   }
 
   const docExists = await Document.findOne({ applicationId: application._id });
   if (!docExists) {
-    res.status(403).json({ message: 'A salary slip upload is required before applying for a loan.' });
+    res.status(403).json({ success: false, message: 'A salary slip upload is required before applying for a loan.' });
     return;
   }
 
   const existingLoan = await Loan.findOne({ userId });
   if (existingLoan) {
-    res.status(409).json({ message: 'A loan application already exists for this account.' });
+    res.status(409).json({ success: false, message: 'A loan application already exists for this account.' });
     return;
   }
 
@@ -150,8 +149,8 @@ export const submitLoan = async (req: Request, res: Response): Promise<void> => 
   });
 
   res.status(201).json({
-    message: 'Loan application submitted successfully.',
-    loan,
+    success: true,
+    data: { loan },
   });
 };
 
@@ -162,10 +161,8 @@ export const getMyLoan = async (req: Request, res: Response): Promise<void> => {
     'status amount tenureDays simpleInterest totalRepayment totalPaid rejectionReason sanctionedAt disbursedAt closedAt createdAt'
   );
 
-  if (!loan) {
-    res.status(200).json({ message: 'No loan application found yet.', loan: null });
-    return;
-  }
-
-  res.status(200).json({ loan });
+  res.status(200).json({
+    success: true,
+    data: { loan: loan ?? null },
+  });
 };

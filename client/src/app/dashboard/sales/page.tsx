@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { AxiosError } from 'axios';
 import api from '@/lib/api';
+import type { ApiSuccess } from '@/types';
 
 interface Lead {
   _id: string;
@@ -27,8 +28,8 @@ export default function SalesPage() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get<{ leads: Lead[] }>('/dashboard/sales/leads');
-      setLeads(data.leads);
+      const { data } = await api.get<ApiSuccess<{ leads: Lead[] }>>('/dashboard/sales/leads');
+      setLeads(data.data.leads);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       setError(axiosErr.response?.data?.message ?? 'Failed to load leads. Please try again.');

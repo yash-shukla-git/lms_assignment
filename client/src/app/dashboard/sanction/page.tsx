@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import type { AxiosError } from 'axios';
 import api from '@/lib/api';
+import type { ApiSuccess } from '@/types';
 
 interface ApplicationDetails {
   fullName: string;
@@ -49,8 +50,8 @@ export default function SanctionPage() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get<{ loans: PendingLoan[] }>('/dashboard/sanction/applications');
-      setLoans(data.loans);
+      const { data } = await api.get<ApiSuccess<{ loans: PendingLoan[] }>>('/dashboard/sanction/applications');
+      setLoans(data.data.loans);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       setError(axiosErr.response?.data?.message ?? 'Failed to load applications.');

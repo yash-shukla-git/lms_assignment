@@ -13,6 +13,11 @@ export interface AuthUser {
   role: Role;
 }
 
+export interface ApiSuccess<T = unknown> {
+  success: true;
+  data: T;
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;

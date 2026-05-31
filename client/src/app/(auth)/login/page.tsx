@@ -6,9 +6,9 @@ import Link from 'next/link';
 import Cookies from 'js-cookie';
 import type { AxiosError } from 'axios';
 import api from '@/lib/api';
-import type { AuthUser } from '@/types';
+import type { AuthUser, ApiSuccess } from '@/types';
 
-interface LoginResponse {
+interface LoginData {
   token: string;
   user: AuthUser;
 }
@@ -25,11 +25,11 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await api.post<LoginResponse>('/auth/login', { email, password });
-      Cookies.set('token', data.token, { expires: 7 });
-      Cookies.set('role', data.user.role, { expires: 7 });
-      localStorage.setItem('user', JSON.stringify(data.user));
-      router.push(data.user.role === 'borrower' ? '/apply' : '/dashboard/sales');
+      const { data } = await api.post<ApiSuccess<LoginData>>('/auth/login', { email, password });
+      Cookies.set('token', data.data.token, { expires: 7 });
+      Cookies.set('role', data.data.user.role, { expires: 7 });
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+      router.push(data.data.user.role === 'borrower' ? '/apply' : '/dashboard/sales');
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       setError(axiosErr.response?.data?.message || 'Login failed. Please try again.');

@@ -6,9 +6,9 @@ import Link from 'next/link';
 import Cookies from 'js-cookie';
 import type { AxiosError } from 'axios';
 import api from '@/lib/api';
-import type { AuthUser } from '@/types';
+import type { AuthUser, ApiSuccess } from '@/types';
 
-interface LoginResponse {
+interface LoginData {
   token: string;
   user: AuthUser;
 }
@@ -27,10 +27,10 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await api.post('/auth/register', { name, email, password });
-      const { data } = await api.post<LoginResponse>('/auth/login', { email, password });
-      Cookies.set('token', data.token, { expires: 7 });
-      Cookies.set('role', data.user.role, { expires: 7 });
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const { data } = await api.post<ApiSuccess<LoginData>>('/auth/login', { email, password });
+      Cookies.set('token', data.data.token, { expires: 7 });
+      Cookies.set('role', data.data.user.role, { expires: 7 });
+      localStorage.setItem('user', JSON.stringify(data.data.user));
       router.push('/apply');
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;

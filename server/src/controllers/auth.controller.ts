@@ -18,7 +18,7 @@ const loginSchema = z.object({
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
   const result = registerSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ message: 'Validation error', errors: result.error.flatten().fieldErrors });
+    res.status(400).json({ success: false, message: 'Validation error', errors: result.error.flatten().fieldErrors });
     return;
   }
 
@@ -26,21 +26,22 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 
   const existing = await User.findOne({ email });
   if (existing) {
-    res.status(409).json({ message: 'Email already in use.' });
+    res.status(409).json({ success: false, message: 'Email already in use.' });
     return;
   }
 
   const user = await User.create({ name, email, password, role: 'borrower' });
 
   res.status(201).json({
-    user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    success: true,
+    data: { user: { id: user._id, name: user.name, email: user.email, role: user.role } },
   });
 };
 
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   const result = loginSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ message: 'Validation error', errors: result.error.flatten().fieldErrors });
+    res.status(400).json({ success: false, message: 'Validation error', errors: result.error.flatten().fieldErrors });
     return;
   }
 
@@ -48,13 +49,13 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 
   const user = await User.findOne({ email });
   if (!user) {
-    res.status(401).json({ message: 'Invalid credentials.' });
+    res.status(401).json({ success: false, message: 'Invalid credentials.' });
     return;
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    res.status(401).json({ message: 'Invalid credentials.' });
+    res.status(401).json({ success: false, message: 'Invalid credentials.' });
     return;
   }
 
@@ -65,7 +66,10 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
   );
 
   res.status(200).json({
-    token,
-    user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    success: true,
+    data: {
+      token,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    },
   });
 };

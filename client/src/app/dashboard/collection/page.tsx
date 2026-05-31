@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import type { AxiosError } from 'axios';
 import api from '@/lib/api';
+import type { ApiSuccess } from '@/types';
 
 type LoanStatus = 'disbursed' | 'closed';
 
@@ -64,8 +65,8 @@ export default function CollectionPage() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get<{ loans: DisbursedLoan[] }>('/dashboard/collection/loans');
-      setLoans(data.loans);
+      const { data } = await api.get<ApiSuccess<{ loans: DisbursedLoan[] }>>('/dashboard/collection/loans');
+      setLoans(data.data.loans);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       setError(axiosErr.response?.data?.message ?? 'Failed to load loans.');
@@ -121,10 +122,10 @@ export default function CollectionPage() {
     if (paymentsMap[loanId]) return;
     setPaymentsLoading(true);
     try {
-      const { data } = await api.get<{ payments: Payment[] }>(
+      const { data } = await api.get<ApiSuccess<{ payments: Payment[] }>>(
         `/dashboard/collection/loans/${loanId}/payments`,
       );
-      setPaymentsMap((prev) => ({ ...prev, [loanId]: data.payments }));
+      setPaymentsMap((prev) => ({ ...prev, [loanId]: data.data.payments }));
     } catch {
       setPaymentsMap((prev) => ({ ...prev, [loanId]: [] }));
     } finally {

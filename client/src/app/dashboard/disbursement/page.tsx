@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { AxiosError } from 'axios';
 import api from '@/lib/api';
+import type { ApiSuccess } from '@/types';
 
 interface SanctionedLoan {
   _id: string;
@@ -35,8 +36,8 @@ export default function DisbursementPage() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get<{ loans: SanctionedLoan[] }>('/dashboard/disbursement/loans');
-      setLoans(data.loans);
+      const { data } = await api.get<ApiSuccess<{ loans: SanctionedLoan[] }>>('/dashboard/disbursement/loans');
+      setLoans(data.data.loans);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       setError(axiosErr.response?.data?.message ?? 'Failed to load loans.');

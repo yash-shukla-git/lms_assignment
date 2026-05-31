@@ -6,7 +6,7 @@ import Cookies from 'js-cookie';
 import type { AxiosError } from 'axios';
 import api from '@/lib/api';
 import { calculateSimpleInterest } from '@/lib/interest';
-import type { AuthUser } from '@/types';
+import type { AuthUser, ApiSuccess } from '@/types';
 
 type LoanStatus = 'pending' | 'sanctioned' | 'rejected' | 'disbursed' | 'closed';
 
@@ -88,9 +88,9 @@ export default function ApplyPage() {
 
   const loadLoan = async () => {
     try {
-      const { data } = await api.get<{ loan: Loan | null }>('/borrower/loan');
-      if (data.loan) {
-        setLoan(data.loan);
+      const { data } = await api.get<ApiSuccess<{ loan: Loan | null }>>('/borrower/loan');
+      if (data.data.loan) {
+        setLoan(data.data.loan);
         setStep(5);
       } else {
         setStep(1);
@@ -181,11 +181,11 @@ export default function ApplyPage() {
     clearError();
     setLoading(true);
     try {
-      const { data } = await api.post<{ loan: Loan }>('/borrower/apply/loan', {
+      const { data } = await api.post<ApiSuccess<{ loan: Loan }>>('/borrower/apply/loan', {
         amount,
         tenureDays: tenure,
       });
-      setLoan(data.loan);
+      setLoan(data.data.loan);
       setStep(5);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;

@@ -16,7 +16,7 @@ export const getLeads = async (_req: Request, res: Response): Promise<void> => {
 
   const leads = borrowers.filter((b) => !appliedSet.has(b._id.toString()));
 
-  res.status(200).json({ leads });
+  res.status(200).json({ success: true, data: { leads } });
 };
 
 // ─── SANCTION ─────────────────────────────────────────────────────────────────
@@ -27,17 +27,17 @@ export const getPendingLoans = async (_req: Request, res: Response): Promise<voi
     .populate('applicationId', 'fullName pan dateOfBirth monthlySalary employmentMode breStatus')
     .select('amount tenureDays simpleInterest totalRepayment status createdAt');
 
-  res.status(200).json({ loans });
+  res.status(200).json({ success: true, data: { loans } });
 };
 
 export const approveLoan = async (req: Request, res: Response): Promise<void> => {
   const loan = await Loan.findById(req.params.loanId);
   if (!loan) {
-    res.status(404).json({ message: 'Loan not found.' });
+    res.status(404).json({ success: false, message: 'Loan not found.' });
     return;
   }
   if (loan.status !== 'pending') {
-    res.status(409).json({ message: `Loan is already '${loan.status}' and cannot be approved.` });
+    res.status(409).json({ success: false, message: `Loan is already '${loan.status}' and cannot be approved.` });
     return;
   }
 
@@ -45,24 +45,24 @@ export const approveLoan = async (req: Request, res: Response): Promise<void> =>
   loan.sanctionedAt = new Date();
   await loan.save();
 
-  res.status(200).json({ message: 'Loan sanctioned.', loan });
+  res.status(200).json({ success: true, data: { loan } });
 };
 
 export const rejectLoan = async (req: Request, res: Response): Promise<void> => {
   const schema = z.object({ rejectionReason: z.string().min(1, 'Rejection reason is required.') });
   const result = schema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ message: 'Validation error', errors: result.error.flatten().fieldErrors });
+    res.status(400).json({ success: false, message: 'Validation error', errors: result.error.flatten().fieldErrors });
     return;
   }
 
   const loan = await Loan.findById(req.params.loanId);
   if (!loan) {
-    res.status(404).json({ message: 'Loan not found.' });
+    res.status(404).json({ success: false, message: 'Loan not found.' });
     return;
   }
   if (loan.status !== 'pending') {
-    res.status(409).json({ message: `Loan is already '${loan.status}' and cannot be rejected.` });
+    res.status(409).json({ success: false, message: `Loan is already '${loan.status}' and cannot be rejected.` });
     return;
   }
 
@@ -70,7 +70,7 @@ export const rejectLoan = async (req: Request, res: Response): Promise<void> => 
   loan.rejectionReason = result.data.rejectionReason;
   await loan.save();
 
-  res.status(200).json({ message: 'Loan rejected.', loan });
+  res.status(200).json({ success: true, data: { loan } });
 };
 
 // ─── DISBURSEMENT ─────────────────────────────────────────────────────────────
@@ -80,17 +80,17 @@ export const getSanctionedLoans = async (_req: Request, res: Response): Promise<
     .populate('userId', 'name email')
     .select('amount tenureDays totalRepayment sanctionedAt status');
 
-  res.status(200).json({ loans });
+  res.status(200).json({ success: true, data: { loans } });
 };
 
 export const disburseLoan = async (req: Request, res: Response): Promise<void> => {
   const loan = await Loan.findById(req.params.loanId);
   if (!loan) {
-    res.status(404).json({ message: 'Loan not found.' });
+    res.status(404).json({ success: false, message: 'Loan not found.' });
     return;
   }
   if (loan.status !== 'sanctioned') {
-    res.status(409).json({ message: `Loan is '${loan.status}' and cannot be disbursed.` });
+    res.status(409).json({ success: false, message: `Loan is '${loan.status}' and cannot be disbursed.` });
     return;
   }
 
@@ -98,7 +98,7 @@ export const disburseLoan = async (req: Request, res: Response): Promise<void> =
   loan.disbursedAt = new Date();
   await loan.save();
 
-  res.status(200).json({ message: 'Loan disbursed.', loan });
+  res.status(200).json({ success: true, data: { loan } });
 };
 
 // ─── COLLECTION ───────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ export const getDisbursedLoans = async (_req: Request, res: Response): Promise<v
     outstandingBalance: parseFloat((loan.totalRepayment - loan.totalPaid).toFixed(2)),
   }));
 
-  res.status(200).json({ loans: result });
+  res.status(200).json({ success: true, data: { loans: result } });
 };
 
 const paymentSchema = z.object({
@@ -125,7 +125,7 @@ const paymentSchema = z.object({
 export const recordPayment = async (req: Request, res: Response): Promise<void> => {
   const result = paymentSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ message: 'Validation error', errors: result.error.flatten().fieldErrors });
+    res.status(400).json({ success: false, message: 'Validation error', errors: result.error.flatten().fieldErrors });
     return;
   }
 
@@ -133,23 +133,24 @@ export const recordPayment = async (req: Request, res: Response): Promise<void> 
 
   const loan = await Loan.findById(req.params.loanId);
   if (!loan) {
-    res.status(404).json({ message: 'Loan not found.' });
+    res.status(404).json({ success: false, message: 'Loan not found.' });
     return;
   }
   if (loan.status !== 'disbursed') {
-    res.status(409).json({ message: `Loan is '${loan.status}'. Payments can only be recorded against disbursed loans.` });
+    res.status(409).json({ success: false, message: `Loan is '${loan.status}'. Payments can only be recorded against disbursed loans.` });
     return;
   }
 
   const utrExists = await Payment.findOne({ utrNumber });
   if (utrExists) {
-    res.status(409).json({ message: 'A payment with this UTR number already exists.' });
+    res.status(409).json({ success: false, message: 'A payment with this UTR number already exists.' });
     return;
   }
 
   const outstanding = parseFloat((loan.totalRepayment - loan.totalPaid).toFixed(2));
   if (amount > outstanding) {
     res.status(400).json({
+      success: false,
       message: `Payment amount (₹${amount}) exceeds outstanding balance (₹${outstanding}).`,
     });
     return;
@@ -171,15 +172,17 @@ export const recordPayment = async (req: Request, res: Response): Promise<void> 
   await loan.save();
 
   res.status(201).json({
-    message: 'Payment recorded.',
-    payment,
-    loan: {
-      _id: loan._id,
-      status: loan.status,
-      totalPaid: loan.totalPaid,
-      totalRepayment: loan.totalRepayment,
-      outstandingBalance: parseFloat((loan.totalRepayment - loan.totalPaid).toFixed(2)),
-      closedAt: loan.closedAt,
+    success: true,
+    data: {
+      payment,
+      loan: {
+        _id: loan._id,
+        status: loan.status,
+        totalPaid: loan.totalPaid,
+        totalRepayment: loan.totalRepayment,
+        outstandingBalance: parseFloat((loan.totalRepayment - loan.totalPaid).toFixed(2)),
+        closedAt: loan.closedAt,
+      },
     },
   });
 };
@@ -189,5 +192,5 @@ export const getLoanPayments = async (req: Request, res: Response): Promise<void
     .populate('recordedBy', 'name')
     .select('utrNumber amount paymentDate recordedBy createdAt');
 
-  res.status(200).json({ payments });
+  res.status(200).json({ success: true, data: { payments } });
 };
