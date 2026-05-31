@@ -8,6 +8,12 @@ the approval lifecycle.
 
 ---
 
+## Demo
+
+Video Walkthrough: https://youtu.be/UfllJw7Y1Kw
+
+---
+
 ## Tech Stack
 
 | Layer      | Technology                                     |
