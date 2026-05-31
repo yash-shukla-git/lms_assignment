@@ -31,6 +31,16 @@ type BREErrorData = {
   rejectionReason?: string;
 };
 
+interface ApplicationData {
+  breStatus: string;
+  breRejectionReason?: string;
+  fullName?: string;
+  pan?: string;
+  dateOfBirth?: string;
+  monthlySalary?: number;
+  employmentMode?: string;
+}
+
 const INR = (n: number) =>
   n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 
@@ -65,6 +75,7 @@ export default function ApplyPage() {
   const [empMode, setEmpMode] = useState('Salaried');
   const [breRejected, setBreRejected] = useState(false);
   const [breReason, setBreReason] = useState('');
+  const [prefilled, setPrefilled] = useState(false);
 
   // Step 3
   const [file, setFile] = useState<File | null>(null);
@@ -88,10 +99,23 @@ export default function ApplyPage() {
 
   const loadLoan = async () => {
     try {
-      const { data } = await api.get<ApiSuccess<{ loan: Loan | null }>>('/borrower/loan');
-      if (data.data.loan) {
-        setLoan(data.data.loan);
+      const [loanRes, appRes] = await Promise.all([
+        api.get<ApiSuccess<{ loan: Loan | null }>>('/borrower/loan'),
+        api.get<ApiSuccess<{ application: ApplicationData | null }>>('/borrower/application'),
+      ]);
+
+      const loan = loanRes.data.data.loan;
+      const application = appRes.data.data.application;
+
+      if (loan) {
+        setLoan(loan);
         setStep(5);
+      } else if (application?.breStatus === 'failed') {
+        setBreRejected(true);
+        setBreReason(application.breRejectionReason ?? 'You do not meet the eligibility criteria.');
+        setStep(2);
+      } else if (application?.breStatus === 'passed') {
+        setStep(3);
       } else {
         setStep(1);
       }
@@ -105,6 +129,41 @@ export default function ApplyPage() {
     Cookies.remove('role');
     localStorage.clear();
     router.push('/login');
+  };
+
+  const startNewApplication = async () => {
+    setLoan(null);
+    setBreRejected(false);
+    setBreReason('');
+    setFile(null);
+    setFileError('');
+    setError('');
+    setPrefilled(false);
+    try {
+      const { data } = await api.get<ApiSuccess<{ application: ApplicationData | null }>>('/borrower/application');
+      const app = data.data.application;
+      if (app?.fullName) {
+        setFullName(app.fullName);
+        setPan(app.pan ?? '');
+        setDob(app.dateOfBirth ? app.dateOfBirth.slice(0, 10) : '');
+        setSalary(app.monthlySalary != null ? String(app.monthlySalary) : '');
+        setEmpMode(app.employmentMode ?? 'Salaried');
+        setPrefilled(true);
+      } else {
+        setFullName('');
+        setPan('');
+        setDob('');
+        setSalary('');
+        setEmpMode('Salaried');
+      }
+    } catch {
+      setFullName('');
+      setPan('');
+      setDob('');
+      setSalary('');
+      setEmpMode('Salaried');
+    }
+    setStep(2);
   };
 
   const clearError = () => setError('');
@@ -130,8 +189,6 @@ export default function ApplyPage() {
       if (data?.breStatus === 'failed') {
         setBreRejected(true);
         setBreReason(data.rejectionReason ?? 'You do not meet the eligibility criteria.');
-      } else if (axiosErr.response?.status === 409) {
-        setStep(3);
       } else {
         setError(data?.message ?? 'Something went wrong. Please try again.');
       }
@@ -313,6 +370,11 @@ export default function ApplyPage() {
               </div>
             ) : (
               <>
+                {prefilled && (
+                  <div className="mb-5 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+                    Your details from your previous application have been pre-filled. Please review and update if anything has changed.
+                  </div>
+                )}
                 {error && (
                   <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
                     {error}
@@ -594,6 +656,15 @@ export default function ApplyPage() {
                 </span>
               </div>
             </div>
+
+            {(loan.status === 'closed' || loan.status === 'rejected') && (
+              <button
+                onClick={() => void startNewApplication()}
+                className="w-full mb-3 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors"
+              >
+                {loan.status === 'closed' ? 'Apply for a New Loan' : 'Apply Again'}
+              </button>
+            )}
 
             <button
               onClick={logout}

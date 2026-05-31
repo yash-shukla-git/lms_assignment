@@ -106,7 +106,7 @@ export const disburseLoan = async (req: Request, res: Response): Promise<void> =
 export const getDisbursedLoans = async (_req: Request, res: Response): Promise<void> => {
   const loans = await Loan.find({ status: 'disbursed' })
     .populate('userId', 'name email')
-    .select('amount tenureDays totalRepayment totalPaid disbursedAt status');
+    .select('amount tenureDays totalRepayment totalPaid disbursedAt status createdAt');
 
   const result = loans.map((loan) => ({
     ...loan.toObject(),
@@ -141,6 +141,19 @@ export const recordPayment = async (req: Request, res: Response): Promise<void> 
     return;
   }
 
+  const paymentDateOnly = paymentDate.slice(0, 10);
+  const loanCreatedDateOnly = loan.createdAt!.toISOString().slice(0, 10);
+  const todayOnly = new Date().toISOString().slice(0, 10);
+
+  if (paymentDateOnly < loanCreatedDateOnly) {
+    res.status(400).json({ success: false, message: 'Payment date cannot be before the loan application date.' });
+    return;
+  }
+  if (paymentDateOnly > todayOnly) {
+    res.status(400).json({ success: false, message: 'Payment date cannot be a future date.' });
+    return;
+  }
+
   const utrExists = await Payment.findOne({ utrNumber });
   if (utrExists) {
     res.status(409).json({ success: false, message: 'A payment with this UTR number already exists.' });
@@ -165,7 +178,9 @@ export const recordPayment = async (req: Request, res: Response): Promise<void> 
   });
 
   loan.totalPaid = parseFloat((loan.totalPaid + amount).toFixed(2));
-  if (loan.totalPaid >= loan.totalRepayment) {
+  const remaining = Math.round((loan.totalRepayment - loan.totalPaid) * 100) / 100;
+  if (remaining <= 0 || remaining < 1) {
+    loan.totalPaid = loan.totalRepayment;
     loan.status = 'closed';
     loan.closedAt = new Date();
   }

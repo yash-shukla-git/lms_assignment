@@ -7,6 +7,7 @@ import {
   submitPersonalDetails,
   uploadDocument,
   submitLoan,
+  getMyApplication,
   getMyLoan,
 } from '../controllers/borrower.controller';
 
@@ -40,6 +41,7 @@ router.use(protect, authorize(['borrower']));
 router.post('/apply/personal', submitPersonalDetails);
 router.post('/apply/upload', upload.single('file'), uploadDocument);
 router.post('/apply/loan', submitLoan);
+router.get('/application', getMyApplication);
 router.get('/loan', getMyLoan);
 
 export default router;

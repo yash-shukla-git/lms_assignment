@@ -15,6 +15,7 @@ interface DisbursedLoan {
   totalPaid: number;
   outstandingBalance: number;
   disbursedAt: string;
+  createdAt: string;
   status: LoanStatus;
   userId: { name: string; email: string };
 }
@@ -51,6 +52,7 @@ export default function CollectionPage() {
   const [payDate, setPayDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [autoClosingId, setAutoClosingId] = useState<string | null>(null);
 
   // Payment history state
   const [viewId, setViewId] = useState<string | null>(null);
@@ -80,12 +82,35 @@ export default function CollectionPage() {
     setTimeout(() => setSuccess(''), 3500);
   };
 
-  const openPayForm = (loanId: string) => {
-    if (payFormId === loanId) {
+  const handleAutoClose = async (loan: DisbursedLoan) => {
+    setAutoClosingId(loan._id);
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      await api.post(`/dashboard/collection/loans/${loan._id}/payment`, {
+        utrNumber: `AUTO-CLOSE-${loan._id}`,
+        amount: loan.outstandingBalance,
+        paymentDate: today,
+      });
+      showSuccess('Loan closed successfully.');
+      await fetchLoans();
+    } catch (err) {
+      const axiosErr = err as AxiosError<{ message?: string }>;
+      setError(axiosErr.response?.data?.message ?? 'Auto-close failed.');
+    } finally {
+      setAutoClosingId(null);
+    }
+  };
+
+  const openPayForm = (loan: DisbursedLoan) => {
+    if (loan.outstandingBalance < 1) {
+      void handleAutoClose(loan);
+      return;
+    }
+    if (payFormId === loan._id) {
       setPayFormId(null);
       return;
     }
-    setPayFormId(loanId);
+    setPayFormId(loan._id);
     setUtr('');
     setPayAmount('');
     setPayDate('');
@@ -95,6 +120,19 @@ export default function CollectionPage() {
   const handlePayment = async (e: FormEvent, loanId: string) => {
     e.preventDefault();
     setFormError('');
+
+    const loan = loans.find((l) => l._id === loanId);
+    const minDate = loan?.createdAt?.slice(0, 10) ?? '';
+    const today = new Date().toISOString().slice(0, 10);
+    if (minDate && payDate < minDate) {
+      setFormError('Payment date cannot be before the loan application date.');
+      return;
+    }
+    if (payDate > today) {
+      setFormError('Payment date cannot be a future date.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       await api.post(`/dashboard/collection/loans/${loanId}/payment`, {
@@ -208,10 +246,15 @@ export default function CollectionPage() {
               {/* Actions */}
               <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-2">
                 <button
-                  onClick={() => openPayForm(loan._id)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  onClick={() => openPayForm(loan)}
+                  disabled={autoClosingId === loan._id}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                 >
-                  {payFormId === loan._id ? 'Cancel' : 'Record Payment'}
+                  {autoClosingId === loan._id
+                    ? 'Closing…'
+                    : payFormId === loan._id
+                    ? 'Cancel'
+                    : 'Record Payment'}
                 </button>
                 <button
                   onClick={() => void togglePayments(loan._id)}
@@ -257,6 +300,8 @@ export default function CollectionPage() {
                           type="date"
                           required
                           value={payDate}
+                          min={loan.createdAt?.slice(0, 10)}
+                          max={new Date().toISOString().slice(0, 10)}
                           onChange={(e) => setPayDate(e.target.value)}
                           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />

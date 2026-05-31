@@ -14,6 +14,7 @@ export interface ILoan extends Document {
   sanctionedAt?: Date;
   disbursedAt?: Date;
   closedAt?: Date;
+  createdAt?: Date;
 }
 
 const loanSchema = new Schema<ILoan>(

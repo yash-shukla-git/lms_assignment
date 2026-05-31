@@ -29,7 +29,15 @@ export default function LoginPage() {
       Cookies.set('token', data.data.token, { expires: 7 });
       Cookies.set('role', data.data.user.role, { expires: 7 });
       localStorage.setItem('user', JSON.stringify(data.data.user));
-      router.push(data.data.user.role === 'borrower' ? '/apply' : '/dashboard/sales');
+      const roleRedirect: Record<string, string> = {
+        borrower: '/apply',
+        sales: '/dashboard/sales',
+        sanction: '/dashboard/sanction',
+        disbursement: '/dashboard/disbursement',
+        collection: '/dashboard/collection',
+        admin: '/dashboard/sales',
+      };
+      router.push(roleRedirect[data.data.user.role] ?? '/dashboard/sales');
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       setError(axiosErr.response?.data?.message || 'Login failed. Please try again.');

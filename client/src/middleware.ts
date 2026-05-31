@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const ROLE_HOME: Record<string, string> = {
+  borrower: '/apply',
+  sales: '/dashboard/sales',
+  sanction: '/dashboard/sanction',
+  disbursement: '/dashboard/disbursement',
+  collection: '/dashboard/collection',
+  admin: '/dashboard/sales',
+};
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('token')?.value;
@@ -11,7 +20,7 @@ export function middleware(request: NextRequest) {
 
   if (isAuthPage) {
     if (token && role) {
-      const dest = role === 'borrower' ? '/apply' : '/dashboard/sales';
+      const dest = ROLE_HOME[role] ?? '/dashboard/sales';
       return NextResponse.redirect(new URL(dest, request.url));
     }
     return NextResponse.next();

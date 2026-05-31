@@ -40,8 +40,14 @@ export const submitPersonalDetails = async (req: Request, res: Response): Promis
 
   const existing = await Application.findOne({ userId });
   if (existing) {
-    res.status(409).json({ success: false, message: 'An application already exists for this account.' });
-    return;
+    const reapplicableLoan = await Loan.findOne({ userId, status: { $in: ['closed', 'rejected'] } });
+    if (!reapplicableLoan) {
+      res.status(409).json({ success: false, message: 'An application already exists for this account.' });
+      return;
+    }
+    // Previous loan is closed — wipe old application and documents so a fresh one can be created
+    await Document.deleteMany({ applicationId: existing._id });
+    await existing.deleteOne();
   }
 
   const bre = runBRE({
@@ -130,7 +136,7 @@ export const submitLoan = async (req: Request, res: Response): Promise<void> => 
     return;
   }
 
-  const existingLoan = await Loan.findOne({ userId });
+  const existingLoan = await Loan.findOne({ userId, status: { $nin: ['closed', 'rejected'] } });
   if (existingLoan) {
     res.status(409).json({ success: false, message: 'A loan application already exists for this account.' });
     return;
@@ -154,10 +160,21 @@ export const submitLoan = async (req: Request, res: Response): Promise<void> => 
   });
 };
 
+export const getMyApplication = async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user!.userId;
+  const application = await Application.findOne({ userId }).select(
+    'breStatus breRejectionReason fullName pan dateOfBirth monthlySalary employmentMode'
+  );
+  res.status(200).json({
+    success: true,
+    data: { application: application ?? null },
+  });
+};
+
 export const getMyLoan = async (req: Request, res: Response): Promise<void> => {
   const userId = req.user!.userId;
 
-  const loan = await Loan.findOne({ userId }).select(
+  const loan = await Loan.findOne({ userId }).sort({ createdAt: -1 }).select(
     'status amount tenureDays simpleInterest totalRepayment totalPaid rejectionReason sanctionedAt disbursedAt closedAt createdAt'
   );
 
