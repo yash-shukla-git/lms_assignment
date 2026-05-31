@@ -118,7 +118,7 @@ export const getDisbursedLoans = async (_req: Request, res: Response): Promise<v
 
 const paymentSchema = z.object({
   utrNumber: z.string().min(1, 'UTR number is required.'),
-  amount: z.coerce.number().positive('Amount must be a positive number.'),
+  amount: z.coerce.number().positive('Payment amount must be greater than 0.'),
   paymentDate: z.string().refine((d) => !isNaN(Date.parse(d)), { message: 'Invalid payment date.' }),
 });
 
@@ -164,7 +164,7 @@ export const recordPayment = async (req: Request, res: Response): Promise<void> 
   if (amount > outstanding) {
     res.status(400).json({
       success: false,
-      message: `Payment amount (₹${amount}) exceeds outstanding balance (₹${outstanding}).`,
+      message: `Payment amount cannot exceed the outstanding balance of ₹${outstanding}.`,
     });
     return;
   }
@@ -178,9 +178,7 @@ export const recordPayment = async (req: Request, res: Response): Promise<void> 
   });
 
   loan.totalPaid = parseFloat((loan.totalPaid + amount).toFixed(2));
-  const remaining = Math.round((loan.totalRepayment - loan.totalPaid) * 100) / 100;
-  if (remaining <= 0 || remaining < 1) {
-    loan.totalPaid = loan.totalRepayment;
+  if (loan.totalPaid >= loan.totalRepayment) {
     loan.status = 'closed';
     loan.closedAt = new Date();
   }

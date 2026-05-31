@@ -52,7 +52,6 @@ export default function CollectionPage() {
   const [payDate, setPayDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [autoClosingId, setAutoClosingId] = useState<string | null>(null);
 
   // Payment history state
   const [viewId, setViewId] = useState<string | null>(null);
@@ -82,30 +81,7 @@ export default function CollectionPage() {
     setTimeout(() => setSuccess(''), 3500);
   };
 
-  const handleAutoClose = async (loan: DisbursedLoan) => {
-    setAutoClosingId(loan._id);
-    const today = new Date().toISOString().split('T')[0];
-    try {
-      await api.post(`/dashboard/collection/loans/${loan._id}/payment`, {
-        utrNumber: `AUTO-CLOSE-${loan._id}`,
-        amount: loan.outstandingBalance,
-        paymentDate: today,
-      });
-      showSuccess('Loan closed successfully.');
-      await fetchLoans();
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      setError(axiosErr.response?.data?.message ?? 'Auto-close failed.');
-    } finally {
-      setAutoClosingId(null);
-    }
-  };
-
   const openPayForm = (loan: DisbursedLoan) => {
-    if (loan.outstandingBalance < 1) {
-      void handleAutoClose(loan);
-      return;
-    }
     if (payFormId === loan._id) {
       setPayFormId(null);
       return;
@@ -135,14 +111,40 @@ export default function CollectionPage() {
 
     setSubmitting(true);
     try {
-      await api.post(`/dashboard/collection/loans/${loanId}/payment`, {
+      const { data } = await api.post<ApiSuccess<{
+        payment: Payment;
+        loan: { _id: string; status: string; totalPaid: number; totalRepayment: number; outstandingBalance: number };
+      }>>(`/dashboard/collection/loans/${loanId}/payment`, {
         utrNumber: utr.trim(),
         amount: Number(payAmount),
         paymentDate: payDate,
       });
+
+      const updatedLoan = data.data.loan;
+
+      if (updatedLoan.status === 'closed') {
+        setLoans((prev) => prev.filter((l) => l._id !== loanId));
+      } else {
+        setLoans((prev) =>
+          prev.map((l) =>
+            l._id === loanId
+              ? { ...l, totalPaid: updatedLoan.totalPaid, outstandingBalance: updatedLoan.outstandingBalance }
+              : l,
+          ),
+        );
+      }
+
+      try {
+        const histRes = await api.get<ApiSuccess<{ payments: Payment[] }>>(
+          `/dashboard/collection/loans/${loanId}/payments`,
+        );
+        setPaymentsMap((prev) => ({ ...prev, [loanId]: histRes.data.data.payments }));
+      } catch {
+        // non-fatal — history will load correctly on next View Payments click
+      }
+
       setPayFormId(null);
       showSuccess('Payment recorded successfully.');
-      await fetchLoans();
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       setFormError(axiosErr.response?.data?.message ?? 'Payment failed. Please try again.');
@@ -157,7 +159,6 @@ export default function CollectionPage() {
       return;
     }
     setViewId(loanId);
-    if (paymentsMap[loanId]) return;
     setPaymentsLoading(true);
     try {
       const { data } = await api.get<ApiSuccess<{ payments: Payment[] }>>(
@@ -234,12 +235,16 @@ export default function CollectionPage() {
                   <div
                     className="h-1.5 bg-green-500 rounded-full transition-all"
                     style={{
-                      width: `${Math.min(100, (loan.totalPaid / loan.totalRepayment) * 100).toFixed(1)}%`,
+                      width: loan.status === 'closed'
+                        ? '100%'
+                        : `${Math.min((loan.totalPaid / loan.totalRepayment) * 100, 99.9).toFixed(1)}%`,
                     }}
                   />
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  {((loan.totalPaid / loan.totalRepayment) * 100).toFixed(1)}% repaid
+                  {loan.status === 'closed'
+                    ? '100% repaid'
+                    : `${Math.min((loan.totalPaid / loan.totalRepayment) * 100, 99.9).toFixed(1)}% repaid`}
                 </p>
               </div>
 
@@ -247,14 +252,9 @@ export default function CollectionPage() {
               <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-2">
                 <button
                   onClick={() => openPayForm(loan)}
-                  disabled={autoClosingId === loan._id}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                 >
-                  {autoClosingId === loan._id
-                    ? 'Closing…'
-                    : payFormId === loan._id
-                    ? 'Cancel'
-                    : 'Record Payment'}
+                  {payFormId === loan._id ? 'Cancel' : 'Record Payment'}
                 </button>
                 <button
                   onClick={() => void togglePayments(loan._id)}
@@ -282,15 +282,21 @@ export default function CollectionPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Amount (₹)</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Amount (₹)
+                          <span className="ml-1 font-normal text-gray-400">
+                            max {INR(loan.outstandingBalance)}
+                          </span>
+                        </label>
                         <input
                           type="number"
                           required
-                          min={1}
+                          min={0.01}
+                          max={loan.outstandingBalance}
                           step="0.01"
                           value={payAmount}
                           onChange={(e) => setPayAmount(e.target.value)}
-                          placeholder="10000"
+                          placeholder={String(loan.outstandingBalance)}
                           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
@@ -340,7 +346,6 @@ export default function CollectionPage() {
                               <th className="text-left pb-2 text-xs font-semibold text-gray-500 uppercase">UTR</th>
                               <th className="text-left pb-2 text-xs font-semibold text-gray-500 uppercase">Amount</th>
                               <th className="text-left pb-2 text-xs font-semibold text-gray-500 uppercase">Date</th>
-                              <th className="text-left pb-2 text-xs font-semibold text-gray-500 uppercase">Recorded By</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
@@ -349,7 +354,6 @@ export default function CollectionPage() {
                                 <td className="py-2 font-mono text-xs text-gray-700">{p.utrNumber}</td>
                                 <td className="py-2 font-medium text-gray-900">{INR(p.amount)}</td>
                                 <td className="py-2 text-gray-600">{fmtDate(p.paymentDate)}</td>
-                                <td className="py-2 text-gray-600">{p.recordedBy.name}</td>
                               </tr>
                             ))}
                           </tbody>
