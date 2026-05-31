@@ -10,7 +10,8 @@ the approval lifecycle.
 
 ## Demo
 
-Live Site: https://lms-assignment-swart.vercel.app/
+Live Site: https://lms-assignment-swart.vercel.app
+
 Video Walkthrough: https://youtu.be/UfllJw7Y1Kw
 
 ---
